@@ -6,9 +6,11 @@ Docker Compose. O comportamento funcional é **preservado** — o código-fonte 
 `upstream` do NGINX passa a apontar para o **Service** do backend.
 
 > **Este README é autossuficiente.** Seguindo os passos abaixo **em ordem**, numa máquina limpa
-> (com Docker), o sistema sobe do zero — clone, criação do cluster, deploy, testes e remoção —
-> **sem nenhuma correção manual**. As imagens já estão **publicadas no Docker Hub**; **não é
-> preciso reconstruí-las** (sem `docker build`, sem `k3d image import`, sem `imagePullSecrets`).
+> (com Docker), o sistema sobe do zero e funciona — clone, criação do cluster, deploy, uso e
+> remoção. As imagens já estão **publicadas no Docker Hub**; **não é preciso reconstruí-las**
+> (sem `docker build`, sem `k3d image import`, sem `imagePullSecrets`). O único passo especial é a
+> **reconexão do backend no teste de persistência** (passo 9, passo 3) — necessária por uma
+> limitação do **código-fonte, que não pode ser alterado** (regra do enunciado) e está explicada lá.
 
 ---
 
@@ -108,8 +110,10 @@ kubectl rollout status deployment/con-guess-backend --timeout=120s
 kubectl rollout status deployment/con-guess-frontend --timeout=120s
 ```
 
-> Os Pods do backend podem reiniciar 1–2 vezes enquanto o Postgres inicializa (o backend abre a
-> conexão no startup). Isso é esperado e se estabiliza sozinho assim que o banco fica pronto.
+> Os Pods do backend podem reiniciar 1–4 vezes enquanto o PostgreSQL inicializa
+> (o backend abre a conexão no startup). Isso é esperado e se estabiliza sozinho
+> assim que o banco fica pronto. Após o rollout, confirme que o contador de
+> reinícios não continua aumentando.
 
 ---
 
@@ -154,17 +158,23 @@ As chamadas passam pelo frontend/NGINX → Service do backend → Postgres. Os p
 **código real** da API (`/create` usa `password`; `/guess/<id>` usa `guess`):
 
 ```bash
-# Criar um jogo (guardar o game_id retornado):
+# Criar um jogo (guardar o game_id retornado; use no lugar de <GAME_ID>):
 curl -fsS -X POST http://localhost:8080/create \
   -H 'Content-Type: application/json' \
   -d '{"password":"banana"}'
-# -> {"game_id":"XXXXXXXX"}
+# -> {"game_id":"<GAME_ID>"}
 
-# Tentar adivinhar (use o game_id acima):
-curl -fsS -X POST http://localhost:8080/guess/XXXXXXXX \
+# Adivinhar errado (palpite curto) — a regra do jogo responde:
+curl -fsS -X POST http://localhost:8080/guess/<GAME_ID> \
   -H 'Content-Type: application/json' \
   -d '{"guess":"a"}'
-# -> {"result":"..."}
+# -> {"result":"Incorrect. Guess is too short"}
+
+# Adivinhar certo (a senha criada acima):
+curl -fsS -X POST http://localhost:8080/guess/<GAME_ID> \
+  -H 'Content-Type: application/json' \
+  -d '{"guess":"banana"}'
+# -> {"result":"Correct"}
 
 # Saude do backend:
 curl -fsS http://localhost:8080/health   # -> {"status":"ok"}
@@ -176,31 +186,40 @@ curl -fsS http://localhost:8080/health   # -> {"status":"ok"}
 
 O `game_id` criado antes deve **sobreviver** à recriação do Pod do banco:
 
+Siga os passos **em ordem** — o passo 3 (reconectar o backend) é **sempre necessário** após
+recriar o banco, porque o código-fonte mantém a conexão em cache (ver nota). Substitua
+`<GAME_ID>` pelo `game_id` obtido no passo 1.
+
 ```bash
-# 1. Crie um jogo (passo 8) e guarde o game_id.
-# 2. Recrie o Pod do banco (o StatefulSet o recria e reancora o mesmo PVC):
+# 1. Crie um jogo e guarde o game_id retornado:
+curl -fsS -X POST http://localhost:8080/create \
+  -H 'Content-Type: application/json' -d '{"password":"banana"}'
+# -> {"game_id":"<GAME_ID>"}
+
+# 2. Recrie o Pod do banco (o StatefulSet o recria e reancora o MESMO PVC):
 kubectl delete pod con-guess-db-0
 kubectl rollout status statefulset/con-guess-db --timeout=120s
 
-# 3. Consulte o game_id criado antes — o dado deve continuar valido (preservado no PVC):
-curl -sS -X POST http://localhost:8080/guess/XXXXXXXX \
-  -H 'Content-Type: application/json' -d '{"guess":"a"}'
-#    -> {"result":"..."}  => PERSISTENCIA OK (game_id sobreviveu ao restart do banco)
-#    -> {"error":"Game not found"}  => dado perdido (nao deve acontecer)
-#    -> erro 500  => conexao psycopg2 obsoleta (limitacao do fonte, ver nota). Reconecte e repita:
-#         kubectl rollout restart deploy/con-guess-backend
-#         kubectl rollout status deployment/con-guess-backend --timeout=120s
-#       depois repita o curl acima -> deve retornar {"result":"..."}
+# 3. Reconecte o backend ao banco reiniciado (obrigatorio — ver nota abaixo):
+kubectl rollout restart deploy/con-guess-backend
+kubectl rollout status deployment/con-guess-backend --timeout=120s
+
+# 4. Consulte o game_id criado no passo 1 — o dado sobreviveu no PVC:
+curl -fsS -X POST http://localhost:8080/guess/<GAME_ID> \
+  -H 'Content-Type: application/json' -d '{"guess":"banana"}'
+# -> {"result":"Correct"}   => PERSISTENCIA OK (o jogo criado ANTES do restart continua valido)
+#    (NAO deve retornar {"error":"Game not found"} — isso seria perda de dado)
 ```
 
-> **Limitação conhecida (do código-fonte, não é requisito da entrega):** o backend abre **uma
-> única** conexão `psycopg2` na inicialização e **não reconecta**; `GET /health` confirma só o
-> processo Flask, não o banco. Após reiniciar o Postgres, a conexão fica obsoleta
-> (`InterfaceError: connection already closed`) e as rotas de negócio erram com o Pod ainda
-> `Ready`. Como o **código-fonte não pode ser alterado** (regra do enunciado), a reconexão é feita
-> **manualmente** com o `kubectl rollout restart deploy/con-guess-backend` do passo 3 — que
-> reproduz o papel do `autoheal` da Unidade 1. **A persistência do dado (objetivo do teste) é
-> comprovada:** o `game_id` continua válido no PVC após o banco reiniciar.
+> **Por que o passo 3 é necessário (limitação conhecida do código-fonte, não é requisito da
+> entrega):** o backend abre **uma única** conexão `psycopg2` na inicialização e **não reconecta**
+> (`repository/postgres.py`); `GET /health` confirma só o processo Flask, não o banco. Após
+> reiniciar o Postgres, a conexão antiga fica obsoleta (`InterfaceError: connection already
+> closed`) e as rotas de negócio retornam **HTTP 500** com o Pod ainda `Ready` — se você pular o
+> passo 3, o passo 4 dá 500 (não é perda de dado, é a conexão morta). Como o **código-fonte não
+> pode ser alterado** (regra do enunciado), a reconexão é feita com o `rollout restart` do passo 3,
+> que reproduz o papel do `autoheal` da Unidade 1. **A persistência do dado é comprovada:** o
+> `game_id` criado antes do restart continua válido no PVC.
 
 ---
 
