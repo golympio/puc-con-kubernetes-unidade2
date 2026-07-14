@@ -43,8 +43,9 @@ Arquitetura `linux/amd64`, tags **versionadas** (SemVer) — **nunca** `latest`.
 
 ## 2. Pré-requisitos e instalação
 
-Você precisa de **Docker**, **k3d** e **kubectl**. Na **VM/OVA do curso** o k3d já vem instalado.
-Numa máquina Linux/WSL2 limpa, instale o que faltar:
+Você precisa de **Docker**, **k3d** e **kubectl** (o **helm** é opcional, só para o bônus da
+seção 12). Na **VM/OVA do curso** o k3d já vem instalado. Numa máquina Linux/WSL2 limpa, instale
+o que faltar:
 
 ```bash
 # Docker: siga https://docs.docker.com/engine/install/ (precisa estar em execução)
@@ -301,23 +302,42 @@ docker image rm golympio/con-guess-backend:v1.0.0 golympio/con-guess-frontend:v1
 ## 12. Instalação alternativa via Helm (bônus)
 
 Além dos manifestos crus (passo 5, **caminho obrigatório e suficiente**), a entrega inclui um
-**Helm Chart** em `k8s/helm/con-guess/` que empacota **exatamente os mesmos objetos**.
+**Helm Chart** em `k8s/helm/con-guess/` que empacota **exatamente os mesmos objetos**. É um
+caminho **opcional/bônus** — use-o **no lugar** do passo 5 (não os dois juntos).
+
+**Instalar o Helm** (caso ainda não tenha):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+helm version
+```
+
+**Validar o Chart sem cluster** (opcional):
+
+```bash
+helm lint k8s/helm/con-guess
+helm template con-guess k8s/helm/con-guess     # renderiza os 10 objetos
+```
+
+**Instalar / desinstalar no cluster** (a partir da raiz do repositório, com o cluster do passo 4 no ar):
 
 ```bash
 # Instalar (equivale a `kubectl apply -f k8s/`):
 helm install con-guess k8s/helm/con-guess
 
-# Verificar o que seria aplicado, sem cluster:
-helm template con-guess k8s/helm/con-guess
-helm lint k8s/helm/con-guess
+# Acompanhar e verificar:
+kubectl rollout status statefulset/con-guess-db --timeout=120s
+kubectl get pods,svc,pvc,hpa
 
 # Desinstalar:
 helm uninstall con-guess
 ```
 
-> O `kubectl apply -f k8s/` **não** é recursivo, então os arquivos do Chart em `k8s/helm/` **não**
-> são aplicados pelo caminho cru — os dois caminhos não colidem. Escolha **um**: manifestos crus
-> **ou** Helm.
+> **Não** rode o passo 5 (`kubectl apply -f k8s/`) **e** o `helm install` no mesmo cluster — ambos
+> criam os mesmos objetos. Escolha **um**. Se já aplicou os manifestos crus, remova-os antes
+> (`kubectl delete -f k8s/`) ou use um cluster limpo. O `kubectl apply -f k8s/` **não** é recursivo,
+> então os arquivos do Chart em `k8s/helm/` não são aplicados pelo caminho cru — por isso não há
+> conflito ao usar só os manifestos.
 
 ---
 
