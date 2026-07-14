@@ -230,12 +230,52 @@ kubectl get hpa -w
 
 ---
 
-## 11. Remover o ambiente
+## 11. Desativar o ambiente (após testes e validações)
+
+Ao terminar de testar, encerre os recursos na ordem abaixo. Há duas opções: **pausar** (para
+retomar depois sem recriar) ou **remover** por completo.
+
+### 11.1 Encerrar o que foi aberto durante os testes
 
 ```bash
-kubectl delete -f k8s/          # remove os objetos
-k3d cluster delete con-guess    # remove o cluster inteiro
+# Parar o port-forward: no terminal em que ele roda, tecle Ctrl+C.
+# Remover o Pod gerador de carga do teste de HPA, se ainda existir:
+kubectl delete pod load --ignore-not-found
 ```
+
+### 11.2 Opção A — Pausar o cluster (retomável, não apaga nada)
+
+```bash
+k3d cluster stop con-guess     # desliga os conteineres; preserva objetos e o PVC (dados)
+# ... para voltar mais tarde:
+k3d cluster start con-guess    # sobe tudo de novo, com os dados intactos
+```
+
+### 11.3 Opção B — Remover por completo
+
+```bash
+# 1) Remover os objetos da aplicacao (opcional, pois o passo 2 ja apaga tudo):
+kubectl delete -f k8s/
+
+# 2) Remover o cluster inteiro (conteineres + volumes/PVC + rede + entrada no kubeconfig):
+k3d cluster delete con-guess
+
+# 3) Conferir que nada ficou:
+k3d cluster list               # con-guess nao deve aparecer
+docker ps -a | grep k3d-con-guess || echo "sem conteineres do cluster (OK)"
+```
+
+> `k3d cluster delete` também descarta o **PVC** (dados do jogo) — é a limpeza total. Se quiser
+> preservar os dados para uma próxima sessão, use a **Opção A** (`stop`/`start`).
+
+### 11.4 (Opcional) Liberar as imagens baixadas do host
+
+```bash
+docker image rm golympio/con-guess-backend:v1.0.0 golympio/con-guess-frontend:v1.0.0 postgres:16.4-alpine
+```
+
+> As imagens continuam **públicas no Docker Hub**; removê-las localmente só libera espaço — um novo
+> `kubectl apply` volta a baixá-las.
 
 ---
 
