@@ -303,41 +303,42 @@ docker image rm golympio/con-guess-backend:v1.0.0 golympio/con-guess-frontend:v1
 
 Além dos manifestos crus (passo 5, **caminho obrigatório e suficiente**), a entrega inclui um
 **Helm Chart** em `k8s/helm/con-guess/` que empacota **exatamente os mesmos objetos**. É um
-caminho **opcional/bônus** — use-o **no lugar** do passo 5 (não os dois juntos).
+caminho **opcional/bônus** e **alternativo ao passo 5** — deploy via Helm **ou** via `kubectl
+apply`, nunca os dois no mesmo cluster (ambos criam os mesmos objetos e colidem).
 
-**Instalar o Helm** (caso ainda não tenha):
+Siga os passos **em ordem** (do passo 4 você já tem o cluster no ar; a partir da raiz do repositório):
 
 ```bash
+# 1. Instalar o Helm (caso ainda nao tenha):
 curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 helm version
-```
 
-**Validar o Chart sem cluster** (opcional):
-
-```bash
+# 2. (Opcional) Validar o Chart sem cluster:
 helm lint k8s/helm/con-guess
-helm template con-guess k8s/helm/con-guess     # renderiza os 10 objetos
-```
+helm template con-guess k8s/helm/con-guess         # renderiza os 10 objetos
 
-**Instalar / desinstalar no cluster** (a partir da raiz do repositório, com o cluster do passo 4 no ar):
+# 3. Se voce JA rodou o passo 5 (kubectl apply -f k8s/) neste cluster, remova os
+#    manifestos crus antes — senao o helm install colide ("already exists"):
+kubectl delete -f k8s/ --ignore-not-found
+kubectl wait --for=delete pod/con-guess-db-0 --timeout=90s 2>/dev/null || true
 
-```bash
-# Instalar (equivale a `kubectl apply -f k8s/`):
+# 4. Instalar via Helm (equivale ao passo 5):
 helm install con-guess k8s/helm/con-guess
 
-# Acompanhar e verificar:
+# 5. Acompanhar e verificar (mesmos checks do passo 6):
 kubectl rollout status statefulset/con-guess-db --timeout=120s
+kubectl rollout status deployment/con-guess-backend --timeout=120s
 kubectl get pods,svc,pvc,hpa
 
-# Desinstalar:
+# 6. Acessar/testar: use os passos 7, 8 e 9 normalmente (o app e identico).
+
+# 7. Desinstalar quando terminar:
 helm uninstall con-guess
 ```
 
-> **Não** rode o passo 5 (`kubectl apply -f k8s/`) **e** o `helm install` no mesmo cluster — ambos
-> criam os mesmos objetos. Escolha **um**. Se já aplicou os manifestos crus, remova-os antes
-> (`kubectl delete -f k8s/`) ou use um cluster limpo. O `kubectl apply -f k8s/` **não** é recursivo,
-> então os arquivos do Chart em `k8s/helm/` não são aplicados pelo caminho cru — por isso não há
-> conflito ao usar só os manifestos.
+> O `kubectl apply -f k8s/` **não** é recursivo, então os arquivos do Chart em `k8s/helm/` não são
+> aplicados pelo caminho cru — por isso o passo 5 (crus) sozinho **não** gera conflito. O conflito
+> só ocorre se você tentar **os dois** no mesmo cluster; o passo 3 acima evita isso.
 
 ---
 
