@@ -1,0 +1,18 @@
+# Headless Service GOVERNANTE do StatefulSet (clusterIP: None). Referenciado em
+# StatefulSet.spec.serviceName; da identidade DNS estavel ao Pod con-guess-db-0.
+# Nao e usado para conectar no banco — para isso ha o Service ClusterIP con-guess-db.
+apiVersion: v1
+kind: Service
+metadata:
+  name: con-guess-db-headless
+  labels:
+    app: con-guess-db
+    app.kubernetes.io/part-of: con-guess
+spec:
+  clusterIP: None
+  selector:
+    app: con-guess-db
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432

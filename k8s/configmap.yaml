@@ -1,0 +1,18 @@
+# Configuracao NAO sensivel compartilhada por backend (FLASK_*) e banco (POSTGRES_*).
+# Os nomes/portas sao os mesmos da Unidade 1; a unica mudanca e o host do banco,
+# que passa a ser o Service ClusterIP con-guess-db (DNS interno do cluster).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: con-guess-config
+  labels:
+    app.kubernetes.io/part-of: con-guess
+data:
+  FLASK_APP: "run.py"
+  FLASK_DB_TYPE: "postgres"
+  FLASK_DB_USER: "postgres"
+  FLASK_DB_NAME: "postgres"
+  FLASK_DB_HOST: "con-guess-db"
+  FLASK_DB_PORT: "5432"
+  POSTGRES_USER: "postgres"
+  POSTGRES_DB: "postgres"

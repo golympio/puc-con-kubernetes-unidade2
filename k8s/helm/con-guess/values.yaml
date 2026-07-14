@@ -1,0 +1,67 @@
+# Valores do Chart con-guess (bonus). Reproduzem os manifestos crus de k8s/.
+# Tags versionadas v1.0.0 — NUNCA latest. Nomes de Service sao FIXOS nos
+# templates (con-guess-backend/-frontend/-db/-db-headless) porque o upstream do
+# NGINX (con-guess-backend:5000) esta embutido na imagem do frontend.
+
+images:
+  backend:
+    repository: golympio/con-guess-backend
+    tag: v1.0.0
+  frontend:
+    repository: golympio/con-guess-frontend
+    tag: v1.0.0
+  postgres:
+    repository: postgres
+    tag: 16.4-alpine
+
+# Configuracao NAO sensivel (ConfigMap con-guess-config).
+config:
+  FLASK_APP: "run.py"
+  FLASK_DB_TYPE: "postgres"
+  FLASK_DB_USER: "postgres"
+  FLASK_DB_NAME: "postgres"
+  FLASK_DB_HOST: "con-guess-db"
+  FLASK_DB_PORT: "5432"
+  POSTGRES_USER: "postgres"
+  POSTGRES_DB: "postgres"
+
+# CREDENCIAL DIDATICA DE LABORATORIO (Secret con-guess-secret) — nao e segredo
+# real; senha descartavel do Postgres local, versionada por reprodutibilidade.
+secret:
+  password: "secretpass"
+
+backend:
+  replicas: 2
+  resources:
+    requests:
+      cpu: 100m        # PRE-REQUISITO do HPA de CPU
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+hpa:
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 60
+
+frontend:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 128Mi
+
+db:
+  storageClassName: local-path
+  storageSize: 1Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi

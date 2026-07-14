@@ -1,0 +1,27 @@
+# AutoScale do backend (requisito do enunciado). Depende de:
+#  - metrics.k8s.io (Metrics Server) — o K3s normalmente ja o traz; validar com
+#    `kubectl top pods` e reutilizar. So incluir Metrics Server em /k8s se ausente.
+#  - resources.requests.cpu no Deployment do backend (definido) — sem ele o HPA
+#    de CPU nao computa utilizacao.
+# Valores aprovados (20260714): min 2 / max 5 / CPU media 60%.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: con-guess-backend
+  labels:
+    app: con-guess-backend
+    app.kubernetes.io/part-of: con-guess
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: con-guess-backend
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60

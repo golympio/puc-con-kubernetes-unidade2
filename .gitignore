@@ -1,0 +1,14 @@
+# Ignora apenas artefatos gerados/locais. Os artefatos da entrega
+# (docker/, k8s/, README.md e o fonte do guess_game) DEVEM ser versionados.
+.venv
+.vscode
+node_modules/
+build/
+*/__pycache__/*
+db/*
+*.sqlite3
+*.pyc
+*.pyo
+bin/
+*.lock
+.rollback-higiene-*/

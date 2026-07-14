@@ -1,0 +1,44 @@
+# Frontend: NGINX servindo o build React e atuando como proxy reverso/LB para o
+# Service do backend (upstream con-guess-backend:5000, embutido na imagem).
+# Probes GET / confirmam que o NGINX esta servindo a pagina.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: con-guess-frontend
+  labels:
+    app: con-guess-frontend
+    app.kubernetes.io/part-of: con-guess
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: con-guess-frontend
+  template:
+    metadata:
+      labels:
+        app: con-guess-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: golympio/con-guess-frontend:v1.0.0
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 3
+            periodSeconds: 10

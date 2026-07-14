@@ -1,0 +1,17 @@
+# Service ClusterIP do backend. E o alvo do upstream do NGINX
+# (con-guess-backend:5000) e balanceia entre os Pods do Deployment.
+apiVersion: v1
+kind: Service
+metadata:
+  name: con-guess-backend
+  labels:
+    app: con-guess-backend
+    app.kubernetes.io/part-of: con-guess
+spec:
+  type: ClusterIP
+  selector:
+    app: con-guess-backend
+  ports:
+    - name: http
+      port: 5000
+      targetPort: 5000

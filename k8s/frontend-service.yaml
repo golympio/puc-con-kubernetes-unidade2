@@ -1,0 +1,17 @@
+# Service ClusterIP do frontend. O acesso externo (avaliador) e feito por
+# `kubectl port-forward svc/con-guess-frontend 8080:80` (ver README).
+apiVersion: v1
+kind: Service
+metadata:
+  name: con-guess-frontend
+  labels:
+    app: con-guess-frontend
+    app.kubernetes.io/part-of: con-guess
+spec:
+  type: ClusterIP
+  selector:
+    app: con-guess-frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80

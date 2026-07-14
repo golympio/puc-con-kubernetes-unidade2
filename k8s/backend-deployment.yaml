@@ -1,0 +1,51 @@
+# Backend Flask (guess_game) inalterado. As 2 replicas iniciais preservam o
+# comportamento de duas instancias da U1 (backend1/backend2) e coincidem com o
+# minReplicas do HPA (backend-hpa.yaml). resources.requests.cpu e PRE-REQUISITO
+# do HPA de CPU. Probes usam a unica rota GET existente: GET /health (PRD 7.4) —
+# ela confirma que o processo Flask responde (nao valida o Postgres).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: con-guess-backend
+  labels:
+    app: con-guess-backend
+    app.kubernetes.io/part-of: con-guess
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: con-guess-backend
+  template:
+    metadata:
+      labels:
+        app: con-guess-backend
+    spec:
+      containers:
+        - name: backend
+          image: golympio/con-guess-backend:v1.0.0
+          ports:
+            - containerPort: 5000
+          envFrom:
+            - configMapRef:
+                name: con-guess-config
+            - secretRef:
+                name: con-guess-secret
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 10

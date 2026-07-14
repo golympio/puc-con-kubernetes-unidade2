@@ -1,0 +1,72 @@
+# PostgreSQL como StatefulSet de 1 replica com volumeClaimTemplate (PVC), para
+# identidade estavel e persistencia durable. StatefulSet (nao Deployment) evita o
+# risco de dois Pods disputarem o mesmo PVC ReadWriteOnce em rollout (PRD 7.3).
+# serviceName aponta o Headless Service governante con-guess-db-headless.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: con-guess-db
+  labels:
+    app: con-guess-db
+    app.kubernetes.io/part-of: con-guess
+spec:
+  serviceName: con-guess-db-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app: con-guess-db
+  template:
+    metadata:
+      labels:
+        app: con-guess-db
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16.4-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: con-guess-config
+                  key: POSTGRES_USER
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: con-guess-config
+                  key: POSTGRES_DB
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: con-guess-secret
+                  key: POSTGRES_PASSWORD
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 15
+            periodSeconds: 15
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 1Gi

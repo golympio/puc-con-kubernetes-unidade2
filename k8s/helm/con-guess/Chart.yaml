@@ -1,0 +1,9 @@
+apiVersion: v2
+name: con-guess
+description: >-
+  BONUS (CON Unidade 2) — Helm Chart que empacota EXATAMENTE os mesmos objetos
+  dos manifestos crus de k8s/ (guess_game no Kubernetes). Caminho de instalacao
+  ALTERNATIVO; nao adiciona nenhuma funcionalidade fora do enunciado.
+type: application
+version: 0.1.0
+appVersion: "v1.0.0"

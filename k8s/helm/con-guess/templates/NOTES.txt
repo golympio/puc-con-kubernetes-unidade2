@@ -1,0 +1,10 @@
+con-guess instalado (bonus via Helm).
+
+Verifique os objetos:
+  kubectl get pods,deploy,statefulset,svc,pvc,hpa
+
+Acesse o frontend por port-forward:
+  kubectl port-forward svc/con-guess-frontend 8080:80
+  # abra http://localhost:8080
+
+Os objetos sao os mesmos dos manifestos crus em k8s/. Ver o README da entrega.
